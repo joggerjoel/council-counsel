@@ -8,7 +8,7 @@
 # Unauthenticated members are skipped with a note (never blocks the run).
 set -u
 
-PROMPT=""; FILE=""; MEMBERS="codex,gemini"
+PROMPT=""; FILE=""; MEMBERS="claude,codex,gemini"
 while [ $# -gt 0 ]; do case "$1" in
   -p) PROMPT="$2"; shift 2;;
   -f) FILE="$2"; shift 2;;
@@ -27,6 +27,7 @@ fi
 [ -n "$PROMPT" ] || { echo "need -p PROMPT or -f FILE" >&2; exit 2; }
 
 OUT="council-runs/$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$OUT"
+CLAUDE="$(command -v claude || echo ~/.local/bin/claude)"
 CODEX="$(command -v codex || echo ~/.local/bin/codex)"
 AGENT="$(command -v agent || echo ~/.local/bin/agent)"
 CORTEX="$(command -v cortex || echo ~/.local/bin/cortex)"
@@ -43,6 +44,7 @@ run() { # member cmd...
 }
 
 echo "Council fan-out → $OUT"
+case ",$MEMBERS," in *,claude,*) run claude "$CLAUDE" -p "$PROMPT" --model opus;; esac
 case ",$MEMBERS," in *,codex,*)  run codex  "$CODEX" exec --skip-git-repo-check -c model_reasoning_effort=high "$PROMPT";; esac
 case ",$MEMBERS," in *,gemini,*) run gemini env GEMINI_CLI_TRUST_WORKSPACE=true "$GEMINI" -p "$PROMPT" --model gemini-2.5-flash;; esac
 case ",$MEMBERS," in *,cursor,*) run cursor "$AGENT" -p "$PROMPT" --output-format text --model auto;; esac

@@ -5,11 +5,12 @@
 # Auth policy: subscription/login sessions only, NOT API keys.
 # Usage: preflight.sh [--members codex,gemini,cursor,cortex]   (default: all present)
 set -u
-MEMBERS="codex,gemini,cursor,cortex"
+MEMBERS="claude,codex,gemini,cursor,cortex"
 [ "${1:-}" = "--members" ] && MEMBERS="$2"
 CANARY='In one short sentence, name one risk of retrying a payment API call.'
-CODEX="$(command -v codex || echo ~/.local/bin/codex)"; AGENT="$(command -v agent || echo ~/.local/bin/agent)"
-CORTEX="$(command -v cortex || echo ~/.local/bin/cortex)"; GEMINI="$(command -v gemini || echo ~/.nvm/versions/node/*/bin/gemini)"
+CLAUDE="$(command -v claude || echo ~/.local/bin/claude)"; CODEX="$(command -v codex || echo ~/.local/bin/codex)"
+AGENT="$(command -v agent || echo ~/.local/bin/agent)"; CORTEX="$(command -v cortex || echo ~/.local/bin/cortex)"
+GEMINI="$(command -v gemini || echo ~/.nvm/versions/node/*/bin/gemini)"
 OUT="$(mktemp -d)"; trap 'rm -rf "$OUT"' EXIT
 
 run() { # member binary cmd...
@@ -22,6 +23,7 @@ run() { # member binary cmd...
     echo "$rc" >"$OUT/$m.rc"; echo $((e-s)) >"$OUT/$m.t" ) &
 }
 echo "Preflight canary → members: $MEMBERS  (login auth only, no API keys, no installs)"
+run claude "$CLAUDE" "$CLAUDE" -p "$CANARY" --model opus
 run codex  "$CODEX"  "$CODEX"  exec --skip-git-repo-check -c model_reasoning_effort=high "$CANARY"
 run gemini "$GEMINI" env GEMINI_CLI_TRUST_WORKSPACE=true "$GEMINI" -p "$CANARY" --model gemini-2.5-flash
 run cursor "$AGENT"  "$AGENT"  -p "$CANARY" --output-format text --model auto
@@ -30,7 +32,7 @@ wait
 
 printf '\n%-8s %-14s %-4s %-5s  %s\n' MEMBER STATE RC SECS SAMPLE
 go=0; slow=0
-for m in codex gemini cursor cortex; do
+for m in claude codex gemini cursor cortex; do
   st="$(cat "$OUT/$m.state" 2>/dev/null || echo "")"
   [ -z "$st" ] && continue
   if [ "$st" = MISSING ]; then printf '%-8s %-14s %-4s %-5s  %s\n' "$m" "⛔ not-installed" "-" "-" "(never auto-install)"; continue; fi

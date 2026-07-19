@@ -3,6 +3,7 @@
 #   ⛔ not installed   ·   ❌ installed but not authed/functional   ·   ✅ functional
 # Auth policy: subscription/login sessions (ChatGPT, `agent login`, Google login) — NOT API keys.
 set -u
+CLAUDE="$(command -v claude || echo ~/.local/bin/claude)"
 CODEX="$(command -v codex  || echo ~/.local/bin/codex)"
 AGENT="$(command -v agent  || echo ~/.local/bin/agent)"
 CORTEX="$(command -v cortex || echo ~/.local/bin/cortex)"
@@ -18,13 +19,14 @@ probe() {
   # cursor headless-auth stall) can't hold up the whole probe. 60s is plenty for a canary.
   ( perl -e 'alarm 60; exec @ARGV' "$@" </dev/null >"$TMP/$m" 2>&1; echo "rc=$?" >>"$TMP/$m" ) &
 }
+probe claude "$CLAUDE" "$CLAUDE" -p 'reply with exactly: OK' --model opus
 probe codex  "$CODEX"  "$CODEX"  exec --skip-git-repo-check 'reply with exactly: OK'
 probe cursor "$AGENT"  "$AGENT"  -p 'reply with exactly: OK' --output-format text --model auto
 probe cortex "$CORTEX" "$CORTEX" exec 'reply with exactly: OK'
 probe gemini "$GEMINI" env GEMINI_CLI_TRUST_WORKSPACE=true "$GEMINI" -p 'reply with exactly: OK' --model gemini-2.5-flash
 wait
 
-for m in codex gemini cursor cortex; do
+for m in claude codex gemini cursor cortex; do
   st="$(cat "$TMP/$m.state" 2>/dev/null || echo MISSING)"
   if [ "$st" = MISSING ]; then echo "⛔ $m: not installed (do NOT install unless the user asks)"
   elif grep -q '^OK' "$TMP/$m" 2>/dev/null; then echo "✅ $m: functional ($(grep -o 'rc=[0-9]*' "$TMP/$m" | tail -1))"
