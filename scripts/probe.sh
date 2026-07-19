@@ -14,7 +14,9 @@ probe() {
   local m="$1" bin="$2"; shift 2
   if [ ! -x "$bin" ] && ! command -v "$bin" >/dev/null 2>&1; then echo "MISSING" >"$TMP/$m.state"; return; fi
   echo "PRESENT" >"$TMP/$m.state"
-  ( "$@" </dev/null >"$TMP/$m" 2>&1; echo "rc=$?" >>"$TMP/$m" ) &
+  # perl alarm bounds each member: a rate-limited/hanging CLI (gemini 429 retries,
+  # cursor headless-auth stall) can't hold up the whole probe. 60s is plenty for a canary.
+  ( perl -e 'alarm 60; exec @ARGV' "$@" </dev/null >"$TMP/$m" 2>&1; echo "rc=$?" >>"$TMP/$m" ) &
 }
 probe codex  "$CODEX"  "$CODEX"  exec --skip-git-repo-check 'reply with exactly: OK'
 probe cursor "$AGENT"  "$AGENT"  -p 'reply with exactly: OK' --output-format text --model auto

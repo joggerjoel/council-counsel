@@ -15,17 +15,17 @@ Get independent verdicts from multiple frontier models on the same artifact, the
 
 **Never install a CLI to make it join. Never use API keys — subscription/login sessions only.** A member participates only if it is _installed → logged in → functionally returns text_. Run `scripts/probe.sh` first; it reports three states (⛔ not installed · ❌ installed-not-functional · ✅ functional) and never installs anything.
 
-**Priority order (ask the strongest first):** **1) Claude (highest model)** → **2) codex (highest model, high reasoning)** → 3) gemini → 4) cursor → 5) cortex. Claude + codex alone is a valid council; the rest are additive breadth.
+**Priority order (ask the strongest first):** **1) Claude (highest model)** → **2) codex (highest model, high reasoning)** → 3) gemini. Claude + codex alone is a valid council; gemini adds breadth. **cursor and cortex are currently OUT** (see below) — the functional council is **Claude + codex + gemini**.
 
-| Member                       | Invocation (non-interactive)                                             | Auth (login, not API key)                                | Limits / notes                                               |
-| ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------ |
-| **Claude** (me)              | native, highest model + high/max effort                                  | ✅ session                                               | session limits — always the anchor + judge                   |
-| **codex** `gpt-5.6-sol`      | `codex exec --skip-git-repo-check -c model_reasoning_effort=high 'P'`    | ✅ ChatGPT **login**                                     | **Rolling 5h + weekly cap** — scarcest; budget 1–2 calls/run |
-| **gemini** `2.5-flash`/`pro` | `GEMINI_CLI_TRUST_WORKSPACE=true gemini -p 'P' --model gemini-2.5-flash` | ⚠️ currently API key → **prefer `gemini` Google login**  | RPM+RPD quota; **slow (minutes)** → always background        |
-| **cursor** (`agent`)         | `agent -p 'P' --output-format text --model auto`                         | ❌ `agent login` (subscription; **no** `CURSOR_API_KEY`) | model `auto`; monthly request quota                          |
-| **cortex**                   | `cortex exec 'P'`                                                        | ❌ Snowflake pw + **TOTP MFA each session**              | Snowflake credits                                            |
+| Member                       | Invocation (non-interactive)                                             | Status (verified 2026-07-19)       | Limits / notes                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude** (me)              | native, highest model + high/max effort                                  | ✅ functional — anchor + judge     | session limits                                                                                                                                                                          |
+| **codex** `gpt-5.6-sol`      | `codex exec --skip-git-repo-check -c model_reasoning_effort=high 'P'`    | ✅ functional (~8s)                | ChatGPT login. **Rolling 5h + weekly cap** — scarcest; 1–2 calls/run                                                                                                                    |
+| **gemini** `2.5-flash`/`pro` | `GEMINI_CLI_TRUST_WORKSPACE=true gemini -p 'P' --model gemini-2.5-flash` | ✅ functional (~4s idle)           | API key. **RPM/RPD quota → 429 triggers 30s+ auto-retries** that look like a hang; the watchdog caps it.                                                                                |
+| **cursor** (`agent`)         | `agent -p 'P' --output-format text --model auto`                         | ❌ **context-blocked**             | Interactive `agent login` works, but headless `agent -p` sees "Not logged in" from the automation shell (session in keychain/app, unreachable). Would need `CURSOR_API_KEY` — declined. |
+| **cortex**                   | `cortex exec 'P'`                                                        | ❌ **license-blocked (permanent)** | `cortex exec` not permitted under the current Snowflake license. Do not retry.                                                                                                          |
 
-CLIs live at `~/.local/bin/{codex,agent,cortex}` and `~/.nvm/.../bin/gemini`. Auth drifts — re-probe before every real run.
+CLIs live at `~/.local/bin/{codex,agent,cortex}` and `~/.nvm/.../bin/gemini`. Auth drifts — re-probe before every real run. Each script bounds every member with a `perl alarm` watchdog so a 429-retry storm or auth stall can't hang the fan-out.
 
 ## Role → model assignment
 
@@ -78,9 +78,9 @@ The council fans one question to many models and **converges** (review). The inv
 
 ## Enabling blocked members (login, never API keys, never install)
 
-- **cursor:** ask the user to run `agent login` (uses their Cursor **subscription**). Do **not** set `CURSOR_API_KEY`. Then add `cursor` to `--members` (model `auto`).
-- **gemini:** currently on `GEMINI_API_KEY`. Preferred is `gemini` **Google login** (subscription) — offer to switch; don't rip out the working key without the user's go-ahead.
-- **cortex:** needs live Snowflake password + current TOTP — ask the user; don't attempt unattended.
+- **cursor — context-blocked, not a quick fix.** `agent login` succeeds interactively (`agent status` → logged in), but the automation/Bash shell sees "Not logged in" — the session lives in the app/keychain the tool shell can't reach. Headless `agent -p` therefore needs `CURSOR_API_KEY` (declined). Only path today: run cursor from the user's own interactive terminal, not scripted. Leave it OUT of `council.sh` runs.
+- **cortex — license-blocked, permanent.** `cortex exec` is not permitted under the current Snowflake license. Don't retry; don't ask the user to MFA — it won't help.
+- **gemini:** on `GEMINI_API_KEY`. Google login (subscription) is preferred — offer to switch; don't rip out the working key without the user's go-ahead. If it 429s, it auto-retries (30s+) — that's the quota, not a hang.
 - If a CLI is **not installed**, report it and stop. Never install one to pad the roster.
 
 ## Common mistakes

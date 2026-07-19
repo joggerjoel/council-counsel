@@ -31,12 +31,15 @@ CODEX="$(command -v codex || echo ~/.local/bin/codex)"
 AGENT="$(command -v agent || echo ~/.local/bin/agent)"
 CORTEX="$(command -v cortex || echo ~/.local/bin/cortex)"
 GEMINI="$(command -v gemini || echo ~/.nvm/versions/node/*/bin/gemini)"
+: "${MEMBER_TIMEOUT:=240}"   # per-member hard cap (s); override via env for big artifacts
 run() { # member cmd...
   local m="$1"; shift
-  # </dev/null is REQUIRED: codex/gemini/agent read stdin when it's a pipe and
-  # block forever waiting for EOF. Without it the whole fan-out hangs.
-  ( "$@" </dev/null >"$OUT/$m.md" 2>"$OUT/$m.err"; echo -e "\n\n<!-- rc=$? -->" >>"$OUT/$m.md" ) &
-  echo "  → $m dispatched"
+  # </dev/null is REQUIRED: codex/gemini/agent read stdin when it's a pipe and block
+  # waiting for EOF. perl alarm bounds each member so a gemini 429-retry storm or a
+  # cursor auth stall can't hang the whole fan-out.
+  ( perl -e 'alarm shift; exec @ARGV' "$MEMBER_TIMEOUT" "$@" </dev/null >"$OUT/$m.md" 2>"$OUT/$m.err"
+    echo -e "\n\n<!-- rc=$? -->" >>"$OUT/$m.md" ) &
+  echo "  → $m dispatched (≤${MEMBER_TIMEOUT}s)"
 }
 
 echo "Council fan-out → $OUT"

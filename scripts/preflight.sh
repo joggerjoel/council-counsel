@@ -17,7 +17,8 @@ run() { # member binary cmd...
   case ",$MEMBERS," in *,$m,*) ;; *) return;; esac
   if [ ! -x "$bin" ] && ! command -v "$bin" >/dev/null 2>&1; then echo MISSING >"$OUT/$m.state"; return; fi
   echo PRESENT >"$OUT/$m.state"
-  ( s=$(date +%s); "$@" </dev/null >"$OUT/$m" 2>"$OUT/$m.e"; rc=$?; e=$(date +%s)
+  # perl alarm (90s) bounds each member so a rate-limited/hanging CLI can't stall preflight.
+  ( s=$(date +%s); perl -e 'alarm 90; exec @ARGV' "$@" </dev/null >"$OUT/$m" 2>"$OUT/$m.e"; rc=$?; e=$(date +%s)
     echo "$rc" >"$OUT/$m.rc"; echo $((e-s)) >"$OUT/$m.t" ) &
 }
 echo "Preflight canary → members: $MEMBERS  (login auth only, no API keys, no installs)"
