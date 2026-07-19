@@ -1,0 +1,4 @@
+# Council run outputs (verdicts are per-run, not source)
+council-runs/
+*.err
+.DS_Store
